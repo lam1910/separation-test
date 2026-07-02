@@ -1,7 +1,7 @@
 import time
 
 from sparql import get_neighbors
-from utils import _merge
+from .utils import _merge
 
 
 RATE_LIMIT_DELAY = 0.25  # seconds between SPARQL requests

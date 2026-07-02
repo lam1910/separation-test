@@ -1,1 +1,1 @@
-from traverse import search_entity, sparql_query, get_neighbors, NEIGHBORS_LIMIT
+from .traverse import search_entity, sparql_query, get_neighbors, NEIGHBORS_LIMIT
