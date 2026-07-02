@@ -10,6 +10,9 @@ HEADERS = {
     "Accept": "application/json",
 }
 
+_session = requests.Session()
+_session.headers.update(HEADERS)
+
 NEIGHBORS_LIMIT = 50
 # Properties to follow. Both directions are explored (outgoing + incoming).
 FOLLOW_PROPS = [
@@ -46,7 +49,7 @@ def search_entity(query: str, limit: int = 5) -> list:
         "limit": limit,
         "type": "item",
     }
-    resp = requests.get(WIKIDATA_API, params=params, headers=HEADERS, timeout=10)
+    resp = _session.get(WIKIDATA_API, params=params, timeout=10)
     resp.raise_for_status()
     return resp.json().get("search", [])
 
@@ -54,10 +57,9 @@ def search_entity(query: str, limit: int = 5) -> list:
 def sparql_query(query: str) -> dict:
     for attempt in range(3):
         try:
-            resp = requests.get(
+            resp = _session.get(
                 SPARQL_ENDPOINT,
                 params={"query": query, "format": "json"},
-                headers=HEADERS,
                 timeout=30,
             )
             resp.raise_for_status()
