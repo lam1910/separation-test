@@ -1,18 +1,39 @@
 #!/usr/bin/env python3
 """
 Six Degrees of Separation — Wikidata Edition
-Find the shortest connection between any two Wikidata entities.
+Find a connection between any two Wikidata entities.
 
-Strategy: bidirectional BFS, expanding whichever frontier is smaller.
+Modes:
+  - Bidirectional BFS: expands whichever frontier is smaller, guarantees
+    the shortest path.
+  - DFS: explores one path at a time down to MAX_DEPTH before
+    backtracking, returns the first path found (not necessarily shortest).
 Each expansion fetches all meaningful neighbours of an entity via SPARQL.
 """
-from search_algo import bidirectional_bfs, MAX_DEPTH
+from search_algo import bidirectional_bfs, dfs, MAX_DEPTH
 from sparql import search_entity
 
 _cache: dict = {}
 
+MODES = {
+    "1": ("Bidirectional BFS (shortest path)", bidirectional_bfs),
+    "2": ("DFS (first path found)", dfs),
+}
+
 
 # ── UI helpers ───────────────────────────────────────────────────────────────
+
+def pick_mode() -> tuple:
+    print("Search mode:")
+    for key, (label, _) in MODES.items():
+        print(f"  [{key}] {label}")
+
+    while True:
+        choice = input(f"  Choose [1-{len(MODES)}] (default 1): ").strip() or "1"
+        if choice in MODES:
+            return MODES[choice]
+        print("  Invalid — try again.")
+
 
 def pick_entity(prompt: str) -> tuple | None:
     raw = input(prompt).strip()
@@ -79,6 +100,9 @@ def main() -> None:
     print("\nConnect any two Wikidata entities (people, places, works …)\n")
 
     try:
+        mode_label, search_fn = pick_mode()
+        print()
+
         start = pick_entity("Start: ")
         if not start:
             return
@@ -96,9 +120,9 @@ def main() -> None:
             return
 
         print(f"Searching for path: {start_label}  →  {end_label}")
-        print(f"Strategy: bidirectional BFS, max {MAX_DEPTH - 1} degrees\n")
+        print(f"Strategy: {mode_label}, max {MAX_DEPTH - 1} degrees\n")
 
-        path = bidirectional_bfs(start_id, end_id, _cache)
+        path = search_fn(start_id, end_id, _cache)
 
         if path:
             show_path(path, start_label, end_label)
