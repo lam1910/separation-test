@@ -74,14 +74,26 @@ def sparql_query(query: str) -> dict:
     raise RuntimeError("SPARQL query failed after retries")
 
 
-def get_neighbors(entity_id: str, cache: dict) -> list:
-    """Return [(neighbor_id, neighbor_label, relation_label), …]."""
-    if entity_id in cache:
-        return cache[entity_id]
+def get_neighbors(entity_id: str, cache: dict, with_sitelinks: bool = False) -> list:
+    """Return [(neighbor_id, neighbor_label, relation_label), …].
+
+    With `with_sitelinks=True`, each tuple gets a 4th element: the
+    neighbour's Wikidata sitelink count, a free proxy for how well
+    connected/notable an entity is. It costs one extra OPTIONAL clause
+    (no extra round trip) and is only requested by strategies that need
+    it, e.g. hub-biased traversal — plain BFS/DFS leave it off.
+    """
+    cache_key = (entity_id, with_sitelinks)
+    if cache_key in cache:
+        return cache[cache_key]
 
     props = " ".join(f"wd:{p}" for p in FOLLOW_PROPS)
+    sitelinks_select = " ?sitelinks" if with_sitelinks else ""
+    sitelinks_clause = (
+        "OPTIONAL { ?nb wikibase:sitelinks ?sitelinks }" if with_sitelinks else ""
+    )
     query = f"""
-SELECT DISTINCT ?nb ?nbLabel ?relLabel WHERE {{
+SELECT DISTINCT ?nb ?nbLabel ?relLabel{sitelinks_select} WHERE {{
   {{
     wd:{entity_id} ?direct ?nb .
     ?rel wikibase:directClaim ?direct .
@@ -93,6 +105,7 @@ SELECT DISTINCT ?nb ?nbLabel ?relLabel WHERE {{
   }}
   FILTER(STRSTARTS(STR(?nb), "http://www.wikidata.org/entity/Q"))
   FILTER(?nb != wd:{entity_id})
+  {sitelinks_clause}
   SERVICE wikibase:label {{ bd:serviceParam wikibase:language "en" }}
 }}
 LIMIT {NEIGHBORS_LIMIT}
@@ -107,7 +120,11 @@ LIMIT {NEIGHBORS_LIMIT}
         seen.add(nid)
         nlabel = b.get("nbLabel", {}).get("value", nid)
         rlabel = b.get("relLabel", {}).get("value", "connected to")
-        result.append((nid, nlabel, rlabel))
+        if with_sitelinks:
+            sitelinks = int(b.get("sitelinks", {}).get("value", 0) or 0)
+            result.append((nid, nlabel, rlabel, sitelinks))
+        else:
+            result.append((nid, nlabel, rlabel))
 
-    cache[entity_id] = result
+    cache[cache_key] = result
     return result

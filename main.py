@@ -8,16 +8,25 @@ Modes:
     the shortest path.
   - DFS: explores one path at a time down to MAX_DEPTH before
     backtracking, returns the first path found (not necessarily shortest).
+  - Hub-biased bidirectional search: expands the most-connected candidates
+    first (by Wikidata sitelink count) instead of by depth, trading the
+    shortest-path guarantee for fewer expansions on well-connected inputs.
 Each expansion fetches all meaningful neighbours of an entity via SPARQL.
 """
-from search_algo import bidirectional_bfs, dfs, MAX_DEPTH
+from search_algo import bidirectional_bfs, dfs, hub_biased_bfs, MAX_DEPTH
+from search_algo.hub_bfs import MAX_EXPANSIONS
 from sparql import search_entity
 
 _cache: dict = {}
 
 MODES = {
-    "1": ("Bidirectional BFS (shortest path)", bidirectional_bfs),
-    "2": ("DFS (first path found)", dfs),
+    "1": ("Bidirectional BFS (shortest path)", bidirectional_bfs, f"max {MAX_DEPTH - 1} degrees"),
+    "2": ("DFS (first path found)", dfs, f"max {MAX_DEPTH - 1} degrees"),
+    "3": (
+        "Hub-biased bidirectional search (chase well-connected entities)",
+        hub_biased_bfs,
+        f"max {MAX_EXPANSIONS} expansions/side, no shortest-path guarantee",
+    ),
 }
 
 
@@ -25,7 +34,7 @@ MODES = {
 
 def pick_mode() -> tuple:
     print("Search mode:")
-    for key, (label, _) in MODES.items():
+    for key, (label, _, _) in MODES.items():
         print(f"  [{key}] {label}")
 
     while True:
@@ -100,7 +109,7 @@ def main() -> None:
     print("\nConnect any two Wikidata entities (people, places, works …)\n")
 
     try:
-        mode_label, search_fn = pick_mode()
+        mode_label, search_fn, mode_limit = pick_mode()
         print()
 
         start = pick_entity("Start: ")
@@ -120,14 +129,14 @@ def main() -> None:
             return
 
         print(f"Searching for path: {start_label}  →  {end_label}")
-        print(f"Strategy: {mode_label}, max {MAX_DEPTH - 1} degrees\n")
+        print(f"Strategy: {mode_label}, {mode_limit}\n")
 
         path = search_fn(start_id, end_id, _cache)
 
         if path:
             show_path(path, start_label, end_label)
         else:
-            print(f"\nNo path found within {MAX_DEPTH - 1} degrees.")
+            print(f"\nNo path found ({mode_limit}).")
             print("Tip: try more famous / well-connected entities.")
 
     except KeyboardInterrupt:
