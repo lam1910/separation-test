@@ -25,6 +25,7 @@ FOLLOW_PROPS = [
     "P69",  # educated at
     "P108",  # employer
     "P463",  # member of
+    "P54",  # member of sports team
     "P161",  # cast member
     "P57",  # director
     "P162",  # producer
